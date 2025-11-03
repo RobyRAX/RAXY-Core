@@ -1,0 +1,9 @@
+{
+  "name": "com.raxy.core",
+  "version": "1.0.0",
+  "displayName": "RAXY Core",
+  "author": {
+    "name": "RobyRAX",
+    "url": "https://github.com/RobyRAX"
+  }
+}
