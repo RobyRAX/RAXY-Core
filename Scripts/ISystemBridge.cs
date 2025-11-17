@@ -28,7 +28,19 @@ namespace RAXY.Core
 
         [HorizontalGroup("System A")]
         [ShowInInspector]
-        public IBridgeable SystemA => SystemBridge?.SystemA;
+        public IBridgeable SystemA
+        {
+            get
+            {
+                if (SystemBridge == null)
+                    return null;
+
+                if (SystemBridge.SystemA == null)
+                    return null;
+
+                return SystemBridge.SystemA;
+            }
+        }
 
         [HorizontalGroup("System A")]
         [ShowInInspector]
@@ -46,7 +58,19 @@ namespace RAXY.Core
 
         [HorizontalGroup("System B")]
         [ShowInInspector]
-        public IBridgeable SystemB => SystemBridge?.SystemB;
+        public IBridgeable SystemB
+        {
+            get
+            {
+                if (SystemBridge == null)
+                    return null;
+
+                if (SystemBridge.SystemB == null)
+                    return null;
+
+                return SystemBridge.SystemB;
+            }
+        }
 
         [HorizontalGroup("System B")]
         [ShowInInspector]
