@@ -204,6 +204,8 @@ namespace RAXY.Core
                 {
                     CustomDebug.Log($"<color=green>[BootstrapManager]</color> Error initializing {bootstrapper}: {ex}");
                 }
+
+                await UniTask.Yield();
             }
         }
 
