@@ -103,9 +103,6 @@ namespace RAXY.Core
             InitPreDefinedToRuntime();
         }
 
-        //[TitleGroup("Runtime")]
-        //[HideInEditorMode]
-        //[Button]
         protected async UniTask InitAllSepGroup()
         {
             if (RuntimeSepGroups == null || RuntimeSepGroups.Count <= 0)
@@ -123,6 +120,8 @@ namespace RAXY.Core
         /// </summary>
         protected async UniTask InitSepGroup(SepGroupRuntime sepGroup)
         {
+            await UniTask.Yield();
+
             List<ISepObject> sepObjectsToInit = sepGroup.SepObjects;
 
             if (sepObjectsToInit == null || sepObjectsToInit.Count == 0)
@@ -183,16 +182,6 @@ namespace RAXY.Core
                 }
             }
         }
-
-        // #if UNITY_EDITOR
-        //         void OnValidate()
-        //         {
-        //             foreach (var group in PreDefinedSepGroups)
-        //             {
-        //                 group.Refresh();
-        //             }
-        //         }
-        // #endif
     }
 
     public enum SepGroupExecutionType
