@@ -7,8 +7,6 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using Cysharp.Threading.Tasks;
 
-
-
 #if UNITY_EDITOR
 using Sirenix.Utilities.Editor;
 using UnityEditor;
@@ -97,10 +95,20 @@ namespace RAXY.Core
             return selectedGroup;
         }
 
+        [SerializeField]
+        [PropertyOrder(-2)]
+        bool _initAllSepGroupOnStart;
+
         protected override void Awake()
         {
             base.Awake();
             InitPreDefinedToRuntime();
+        }
+
+        protected virtual void Start()
+        {
+            if (_initAllSepGroupOnStart)
+                InitAllSepGroup().Forget();
         }
 
         protected async UniTask InitAllSepGroup()
