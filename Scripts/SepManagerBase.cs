@@ -97,7 +97,7 @@ namespace RAXY.Core
 
         [SerializeField]
         [PropertyOrder(-2)]
-        bool _initAllSepGroupOnStart;
+        protected bool _initAllSepGroupOnStart;
 
         protected override void Awake()
         {
