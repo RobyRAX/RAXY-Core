@@ -6,7 +6,6 @@ using Cysharp.Threading.Tasks;
 using UnityEngine.AddressableAssets;
 using RAXY.Utility;
 
-
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -101,16 +100,6 @@ namespace RAXY.Core
 
                 try
                 {
-                    var expectedName = refObj.editorAsset != null ? refObj.editorAsset.name : refObj.RuntimeKey.ToString();
-                    var existing = FindExistingBootstrapper(expectedName); // 🟢 same logic
-                    if (existing != null)
-                    {
-                        CustomDebug.Log($"<color=green>[BootstrapManager]</color> Bootstrapper '{expectedName}' already exists. Skipping load.");
-                        if (!Bootstrappers.Contains(existing))
-                            Bootstrappers.Add(existing);
-                        continue;
-                    }
-
                     CustomDebug.Log($"<color=green>[BootstrapManager]</color> Loading '{refObj.RuntimeKey}'...");
                     var handle = refObj.LoadAssetAsync<GameObject>();
                     await handle.Task;
@@ -119,6 +108,15 @@ namespace RAXY.Core
                     if (prefab == null)
                     {
                         CustomDebug.Log($"<color=green>[BootstrapManager]</color> Failed to load asset '{refObj.RuntimeKey}'.");
+                        continue;
+                    }
+
+                    var existing = FindExistingBootstrapper(prefab.name); // 🟢 same logic
+                    if (existing != null)
+                    {
+                        CustomDebug.Log($"<color=green>[BootstrapManager]</color> Bootstrapper '{prefab.name}' already exists. Skipping load.");
+                        if (!Bootstrappers.Contains(existing))
+                            Bootstrappers.Add(existing);
                         continue;
                     }
 
