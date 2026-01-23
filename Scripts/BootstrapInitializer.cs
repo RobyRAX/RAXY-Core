@@ -17,23 +17,39 @@ namespace RAXY.Core
         [TitleGroup("Bootstrap Settings")]
         public bool useAddressables;
 
-        [ShowIf(nameof(useAddressables))]
-#if UNITY_EDITOR
+        [TitleGroup("Bootstrap Settings")]
+        [ShowIf("@useAddressables")]
         [ListDrawerSettings(ElementColor = "GetElementColor_Addressable", ShowIndexLabels = true)]
         [InfoBox("Non Bootstrapper reference detected!", InfoMessageType = InfoMessageType.Error, VisibleIf = "HasInvalidObjects_Addressable")]
-#endif
         public List<AssetReferenceGameObject> addressableBootstrappers = new();
 
-        [HideIf(nameof(useAddressables))]
-#if UNITY_EDITOR
+        [TitleGroup("Bootstrap Settings")]
+        [SerializeField]
+        [ReadOnly]
+        [ShowIf("@useAddressables")]
+        List<string> _bootstrapperNames;
+
+        [TitleGroup("Bootstrap Settings")]
+        [HideIf("@useAddressables")]
         [ListDrawerSettings(ElementColor = "GetElementColor", ShowIndexLabels = true)]
         [InfoBox("Non Bootstrapper reference detected!", InfoMessageType = InfoMessageType.Error, VisibleIf = "HasInvalidObjects")]
-#endif
         public List<GameObject> prefabBootstrappers = new();
 
         public List<IBootstrapper> Bootstrappers { get; private set; } = new();
 
 #if UNITY_EDITOR
+        void OnValidate()
+        {
+            _bootstrapperNames = new();
+
+            foreach (var addressableBootstrap in addressableBootstrappers)
+            {
+                _bootstrapperNames.Add(addressableBootstrap.editorAsset.name);
+            }
+
+            EditorUtility.SetDirty(this);
+        }
+
         [TitleGroup("Spawned Bootstrapper")]
         [ShowInInspector, TableList(ShowIndexLabels = true)]
         private List<IBootstrapperDrawer> _allBootstrappersDrawer
@@ -93,30 +109,38 @@ namespace RAXY.Core
                 return;
             }
 
-            foreach (var refObj in addressableBootstrappers)
+            for (int index = 0; index < addressableBootstrappers.Count; index++)
             {
+                var refObj = addressableBootstrappers[index];
                 if (refObj == null)
                     continue;
 
                 try
                 {
-                    CustomDebug.Log($"<color=green>[BootstrapManager]</color> Loading '{refObj.RuntimeKey}'...");
+                    var expectedName = _bootstrapperNames[index];
+                    var existing = FindExistingBootstrapper(expectedName);
+                    if (existing != null)
+                    {
+                        CustomDebug.Log(
+                            $"<color=green>[BootstrapManager]</color> Bootstrapper '{expectedName}' already exists. Skipping load.");
+
+                        if (!Bootstrappers.Contains(existing))
+                            Bootstrappers.Add(existing);
+
+                        continue;
+                    }
+
+                    CustomDebug.Log(
+                        $"<color=green>[BootstrapManager]</color> Loading '{refObj.RuntimeKey}'...");
+
                     var handle = refObj.LoadAssetAsync<GameObject>();
                     await handle.Task;
 
                     var prefab = handle.Result;
                     if (prefab == null)
                     {
-                        CustomDebug.Log($"<color=green>[BootstrapManager]</color> Failed to load asset '{refObj.RuntimeKey}'.");
-                        continue;
-                    }
-
-                    var existing = FindExistingBootstrapper(prefab.name); // 🟢 same logic
-                    if (existing != null)
-                    {
-                        CustomDebug.Log($"<color=green>[BootstrapManager]</color> Bootstrapper '{prefab.name}' already exists. Skipping load.");
-                        if (!Bootstrappers.Contains(existing))
-                            Bootstrappers.Add(existing);
+                        CustomDebug.Log(
+                            $"<color=green>[BootstrapManager]</color> Failed to load asset '{refObj.RuntimeKey}'.");
                         continue;
                     }
 
@@ -124,16 +148,20 @@ namespace RAXY.Core
                     instance.name = prefab.name;
 
                     if (instance.TryGetComponent<IBootstrapper>(out var bootstrapper))
+                    {
                         Bootstrappers.Add(bootstrapper);
+                    }
                     else
                     {
-                        CustomDebug.Log($"<color=green>[BootstrapManager]</color> '{prefab.name}' does not implement IBootstrapper!");
+                        CustomDebug.Log(
+                            $"<color=green>[BootstrapManager]</color> '{prefab.name}' does not implement IBootstrapper!");
                         Destroy(instance);
                     }
                 }
                 catch (System.Exception e)
                 {
-                    CustomDebug.Log($"<color=green>[BootstrapManager]</color> Error loading Addressable: {e}");
+                    CustomDebug.Log(
+                        $"<color=green>[BootstrapManager]</color> Error loading Addressable: {e}");
                 }
             }
         }
