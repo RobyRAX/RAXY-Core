@@ -125,6 +125,7 @@ namespace RAXY.Core
 
         /// <summary>
         /// Initializes a list of ISepObject asynchronously (with error protection).
+        /// Executes all PreInit() calls first, then all Init() calls.
         /// </summary>
         protected async UniTask InitSepGroup(SepGroupRuntime sepGroup)
         {
@@ -135,9 +136,81 @@ namespace RAXY.Core
             if (sepObjectsToInit == null || sepObjectsToInit.Count == 0)
                 return;
 
-            if (sepGroup.ExecutionType == SepGroupExecutionType.Sequential)
+            // Filter objects that need PreInit
+            var objectsNeedingPreInit = sepObjectsToInit.Where(obj => obj != null && obj.UsePreInit).ToList();
+            
+            // Execute all PreInit() calls first
+            if (objectsNeedingPreInit.Count > 0)
             {
-                foreach (var obj in sepObjectsToInit)
+                await ExecutePreInitPhase(objectsNeedingPreInit, sepGroup.ExecutionType);
+            }
+
+            // Then execute all Init() calls
+            await ExecuteInitPhase(sepObjectsToInit, sepGroup.ExecutionType);
+        }
+
+        private async UniTask ExecutePreInitPhase(List<ISepObject> objects, SepGroupExecutionType executionType)
+        {
+            if (executionType == SepGroupExecutionType.Sequential)
+            {
+                foreach (var obj in objects)
+                {
+                    if (obj == null)
+                        continue;
+
+                    try
+                    {
+                        await obj.PreInit();
+                        CustomDebug.Log($"<color=cyan>[{obj.GetGameObject.name}]</color> PreInit Done");
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError($"[SEP PREINIT ERROR] {obj}: {e}");
+                    }
+                }
+            }
+            else // Parallel
+            {
+                var tasks = new List<UniTask>();
+
+                foreach (var obj in objects)
+                {
+                    if (obj == null)
+                        continue;
+
+                    var target = obj;
+                    var safeName = target?.GetType().Name ?? "Unknown";
+
+                    tasks.Add(UniTask.Create(async () =>
+                    {
+                        try
+                        {
+                            await target.PreInit();
+                            CustomDebug.Log($"<color=cyan>[{target.GetGameObject.name}]</color> PreInit Done");
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogError($"[SEP PREINIT ERROR] {safeName}: {e}");
+                        }
+                    }));
+                }
+
+                try
+                {
+                    await UniTask.WhenAll(tasks);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[SEP PREINIT PARALLEL ERROR] {e}");
+                }
+            }
+        }
+
+        private async UniTask ExecuteInitPhase(List<ISepObject> objects, SepGroupExecutionType executionType)
+        {
+            if (executionType == SepGroupExecutionType.Sequential)
+            {
+                foreach (var obj in objects)
                 {
                     if (obj == null)
                         continue;
@@ -157,7 +230,7 @@ namespace RAXY.Core
             {
                 var tasks = new List<UniTask>();
 
-                foreach (var obj in sepObjectsToInit)
+                foreach (var obj in objects)
                 {
                     if (obj == null)
                         continue;
@@ -165,13 +238,12 @@ namespace RAXY.Core
                     var target = obj;
                     var safeName = target?.GetType().Name ?? "Unknown";
 
-                    // run init concurrently
                     tasks.Add(UniTask.Create(async () =>
                     {
                         try
                         {
-                            await target.Init(); // keep this async
-                            CustomDebug.Log($"<color=yellow>[{obj.GetGameObject.name}]</color> Init Done");
+                            await target.Init();
+                            CustomDebug.Log($"<color=yellow>[{target.GetGameObject.name}]</color> Init Done");
                         }
                         catch (Exception e)
                         {
@@ -182,11 +254,11 @@ namespace RAXY.Core
 
                 try
                 {
-                    await UniTask.WhenAll(tasks); // await all in parallel
+                    await UniTask.WhenAll(tasks);
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[SEP PARALLEL GROUP ERROR] {sepGroup.GetType().Name}: {e}");
+                    Debug.LogError($"[SEP INIT PARALLEL ERROR] {e}");
                 }
             }
         }
@@ -209,7 +281,7 @@ namespace RAXY.Core
 
 #if UNITY_EDITOR
         [ListDrawerSettings(ElementColor = "GetElementColor", OnTitleBarGUI = "DrawRefreshBtn", DraggableItems = false)]
-        [LabelText("Order  | Sep Objects")]
+        [LabelText("Order  | Pre Init | Sep Objects")]
         [InfoBox("Non SEP Objects detected!", InfoMessageType = InfoMessageType.Error, VisibleIf = "HasInvalidObjects")]
 #endif
         public List<SepObjectEntry> SepObjects = new();
@@ -303,6 +375,11 @@ namespace RAXY.Core
         [HideLabel]
         public int Order;
 
+        [HorizontalGroup(50)]
+        [LabelText(" ")]
+        [LabelWidth(15)]
+        public bool UsePreInit;
+
         [HorizontalGroup]
         [HideLabel]
         public GameObject SepObject;
@@ -356,6 +433,7 @@ namespace RAXY.Core
                     continue;
 
                 sepObj.Order = objectEntry.Order;
+                sepObj.UsePreInit = objectEntry.UsePreInit;
                 sepObj.SepGroup = GroupName;
 
                 SepObjects.Add(sepObj);

@@ -7,12 +7,14 @@ namespace RAXY.Core
 {
     public interface ISepObject
     {
+        public UniTask PreInit();
         public UniTask Init();
         public GameObject GetGameObject { get; }
         public bool FirstInitDone { get; set; }
 
         public int Order { get; set; } 
         public string SepGroup { get; set; }
+        public bool UsePreInit { get; set; }
     }
 
 #if UNITY_EDITOR
