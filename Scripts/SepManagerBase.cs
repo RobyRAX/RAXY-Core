@@ -160,7 +160,10 @@ namespace RAXY.Core
 
                     try
                     {
+                        await UniTask.WaitUntil(() => BootstrapPauser.IsPaused == false);
+                        CustomDebug.Log($"<color=cyan>[{obj.GetGameObject.name}]</color> PreInit Start");
                         await obj.PreInit();
+                        await UniTask.Yield();
                         CustomDebug.Log($"<color=cyan>[{obj.GetGameObject.name}]</color> PreInit Done");
                     }
                     catch (Exception e)
@@ -185,6 +188,7 @@ namespace RAXY.Core
                     {
                         try
                         {
+                            CustomDebug.Log($"<color=cyan>[{target.GetGameObject.name}]</color> PreInit Start");
                             await target.PreInit();
                             CustomDebug.Log($"<color=cyan>[{target.GetGameObject.name}]</color> PreInit Done");
                         }
@@ -197,6 +201,7 @@ namespace RAXY.Core
 
                 try
                 {
+                    await UniTask.WaitUntil(() => BootstrapPauser.IsPaused == false);
                     await UniTask.WhenAll(tasks);
                 }
                 catch (Exception e)
@@ -217,7 +222,10 @@ namespace RAXY.Core
 
                     try
                     {
+                        await UniTask.WaitUntil(() => BootstrapPauser.IsPaused == false);
+                        CustomDebug.Log($"<color=yellow>[{obj.GetGameObject.name}]</color> Init Start");
                         await obj.Init();
+                        await UniTask.Yield();
                         CustomDebug.Log($"<color=yellow>[{obj.GetGameObject.name}]</color> Init Done");
                     }
                     catch (Exception e)
@@ -242,6 +250,7 @@ namespace RAXY.Core
                     {
                         try
                         {
+                            CustomDebug.Log($"<color=yellow>[{obj.GetGameObject.name}]</color> Init Start");
                             await target.Init();
                             CustomDebug.Log($"<color=yellow>[{target.GetGameObject.name}]</color> Init Done");
                         }
@@ -254,6 +263,7 @@ namespace RAXY.Core
 
                 try
                 {
+                    await UniTask.WaitUntil(() => BootstrapPauser.IsPaused == false);
                     await UniTask.WhenAll(tasks);
                 }
                 catch (Exception e)

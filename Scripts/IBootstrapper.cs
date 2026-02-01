@@ -13,6 +13,7 @@ namespace RAXY.Core
         public event Action<bool> OnInitDone;
         public bool IsInitDone_FirstTime { get; set; }
         public bool IsInitDone { get; set; }
+        public GameObject GetGameObject { get; }
 
         public UniTask InitializeAsync_FirstTime();
     }

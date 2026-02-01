@@ -5,6 +5,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine.AddressableAssets;
 using RAXY.Utility;
+using RAXY.Core.Addressable;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -71,9 +72,34 @@ namespace RAXY.Core
         {
             CustomDebug.Log("<color=green>[BootstrapManager]</color> Starting bootstrap sequence...");
             await SpawnBootstrappersAsync();
+
+            // List<IAddressableAssetRequester> addressableRequesters = new();
+            // foreach (var bootstrapper in Bootstrappers)
+            // {
+            //     if (bootstrapper is IAddressableAssetRequester requester)
+            //         addressableRequesters.Add(requester);
+
+            //     var requesters = bootstrapper.GetGameObject.GetComponentsInChildren<IAddressableAssetRequester>();
+            //     addressableRequesters.AddRange(requesters);
+            // }
+            //await Load_NeededAssets(addressableRequesters);
             await InitializeSequentiallyAsync();
             CustomDebug.Log("<color=green>[BootstrapManager]</color> All systems ready!");
         }
+
+        // #region ADDRESSABLE SUPPORT
+        // public async UniTask Load_NeededAssets(List<IAddressableAssetRequester> requesters)
+        // {
+        //     foreach (var requester in requesters)
+        //     {
+        //         var assetRefs = requester.GetAssetReferences();
+        //         foreach (var assetRef in assetRefs)
+        //         {
+        //             await AddressableService.LoadAssetAsync<Object>(assetRef);
+        //         }
+        //     }
+        // }
+        // #endregion
 
         // ────────────────────────────────────────────────────────────────────────────────
         #region SPAWN LOGIC
@@ -96,7 +122,7 @@ namespace RAXY.Core
                     return true;
 
                 // Use UnityEngine.Object typed equality to catch "destroyed" Unity objects
-                var unityObj = b as UnityEngine.Object;
+                var unityObj = b as Object;
                 return unityObj == null;
             });
         }
@@ -133,10 +159,7 @@ namespace RAXY.Core
                     CustomDebug.Log(
                         $"<color=green>[BootstrapManager]</color> Loading '{refObj.RuntimeKey}'...");
 
-                    var handle = refObj.LoadAssetAsync<GameObject>();
-                    await handle.Task;
-
-                    var prefab = handle.Result;
+                    var prefab = await AddressableService.LoadAssetAsync<GameObject>(refObj);
                     if (prefab == null)
                     {
                         CustomDebug.Log(
@@ -223,7 +246,10 @@ namespace RAXY.Core
 
                 try
                 {
+                    await UniTask.WaitUntil(() => BootstrapPauser.IsPaused == false);
                     await bootstrapper.InitializeAsync_FirstTime();
+                    await UniTask.Yield();
+                    
                     CustomDebug.Log($"<color=green>[BootstrapManager]</color> Initialized {bootstrapper}");
                 }
                 catch (System.Exception ex)

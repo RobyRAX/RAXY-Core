@@ -7,10 +7,32 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
+using Object = UnityEngine.Object;
+
 namespace RAXY.Core.Addressable
 {
-    public class AddressableService : Singleton<AddressableService>
+    public class AddressableService : MonoBehaviour
     {
+        private static AddressableService _instance;
+        public static AddressableService Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = FindAnyObjectByType<AddressableService>();
+                    
+                    if (_instance == null)
+                    {
+                        var go = new GameObject(nameof(AddressableService));
+                        _instance = go.AddComponent<AddressableService>();
+                        DontDestroyOnLoad(go);
+                    }
+                }
+                return _instance;
+            }
+        }
+
         [HideInInspector]
         public Dictionary<string, AsyncOperationHandle> handleDict = new();
 
@@ -34,31 +56,67 @@ namespace RAXY.Core.Addressable
         }
 #endif
 
-        public async UniTask<T> LoadAssetAsync<T>(AssetReference reference) where T : class
+        private void OnDestroy()
         {
-            if (handleDict.TryGetValue(reference.AssetGUID, out var existingHandle))
+            if (_instance == this)
             {
-                if (existingHandle.IsDone && existingHandle.Status == AsyncOperationStatus.Succeeded)
+                _instance = null;
+            }
+        }
+
+        public static async UniTask<T> LoadAssetAsync<T>(AssetReference reference) where T : class
+        {
+            try
+            {
+                // Validate reference
+                if (reference == null)
                 {
+                    CustomDebug.LogError("AssetReference is null");
+                    return null;
+                }
+
+                if (!reference.RuntimeKeyIsValid())
+                {
+                    CustomDebug.LogError($"AssetReference is not valid: {reference.AssetGUID}");
+                    return null;
+                }
+
+                CustomDebug.Log($"Loading asset: {reference.RuntimeKey}");
+                
+                if (Instance.handleDict.TryGetValue(reference.AssetGUID, out var existingHandle))
+                {
+                    if (existingHandle.IsDone && existingHandle.Status == AsyncOperationStatus.Succeeded)
+                    {
+                        CustomDebug.Log($"Asset already loaded: {reference.RuntimeKey}");
+                        return existingHandle.Result as T;
+                    }
+
+                    CustomDebug.Log($"Waiting for asset to load: {reference.RuntimeKey}");
+                    await existingHandle.Task;
                     return existingHandle.Result as T;
                 }
 
-                await existingHandle.Task;
-                return existingHandle.Result as T;
+                CustomDebug.Log($"Starting async load for asset: {reference.RuntimeKey}");
+                var handle = reference.LoadAssetAsync<T>();
+                Instance.handleDict.Add(reference.AssetGUID, handle);
+
+                await handle.Task;
+
+                if (handle.Status != AsyncOperationStatus.Succeeded)
+                {
+                    CustomDebug.LogError($"Failed to load asset: {reference.RuntimeKey}");
+                    Instance.handleDict.Remove(reference.AssetGUID);
+                    return null;
+                }
+
+                CustomDebug.Log($"Successfully loaded asset: {reference.RuntimeKey}");
+                return handle.Result;
             }
-
-            var handle = reference.LoadAssetAsync<T>();
-            handleDict.Add(reference.AssetGUID, handle);
-
-            await handle.Task;
-
-            if (handle.Status != AsyncOperationStatus.Succeeded)
+            catch (Exception ex)
             {
-                handleDict.Remove(reference.AssetGUID);
-                throw new Exception($"Failed to load Addressable: {reference.RuntimeKey}");
+                CustomDebug.LogError($"Exception while loading asset: {ex.Message}");
+                return null;
             }
-
-            return handle.Result;
         }
 
         /// <summary>
@@ -67,9 +125,9 @@ namespace RAXY.Core.Addressable
         /// <typeparam name="T"></typeparam>
         /// <param name="reference"></param>
         /// <returns></returns>
-        public T GetLoadedAsset<T>(AssetReference reference) where T : class
+        public static T GetLoadedAsset<T>(AssetReference reference) where T : class
         {
-            if (handleDict.TryGetValue(reference.AssetGUID, out var handle))
+            if (Instance.handleDict.TryGetValue(reference.AssetGUID, out var handle))
             {
                 if (handle.IsDone && handle.Status == AsyncOperationStatus.Succeeded)
                 {
@@ -83,12 +141,12 @@ namespace RAXY.Core.Addressable
 
         [TitleGroup("Test Function")]
         [Button]
-        public void Release(AssetReference reference)
+        public static void Release(AssetReference reference)
         {
-            if (handleDict.TryGetValue(reference.AssetGUID, out var handle))
+            if (Instance.handleDict.TryGetValue(reference.AssetGUID, out var handle))
             {
                 Addressables.Release(handle);
-                handleDict.Remove(reference.AssetGUID);
+                Instance.handleDict.Remove(reference.AssetGUID);
             }
         }
 
@@ -104,6 +162,109 @@ namespace RAXY.Core.Addressable
         GameObject TestGet_GameObject(AssetReference reference)
         {
             return GetLoadedAsset<GameObject>(reference);
+        }
+
+        public static async UniTask<T> ResolveAsync<T>(IAddressableAssetProvider<T> provider) where T : Object
+        {
+            if (provider == null)
+            {
+                Debug.LogError("[Resolver] Provider is NULL");
+                return null;
+            }
+
+            try
+            {
+                if (provider.UseAddressable)
+                {
+#if UNITY_EDITOR
+                    if (provider.AssetReference != null && provider.AssetReference.editorAsset != null)
+                    {
+                        return provider.AssetReference.editorAsset;
+                    }
+#endif
+
+                    if (provider.AssetReference != null && provider.AssetReference.RuntimeKeyIsValid())
+                    {
+                        provider.CachedAddressableAsset = await LoadAssetAsync<T>(provider.AssetReference);
+                        return provider.CachedAddressableAsset;
+                    }
+                }
+                else
+                {
+                    return provider.DirectAsset;
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[Resolver] Failed loading {typeof(T)} from Addressables.\n" +
+                               $"Key: {provider.AssetReference?.RuntimeKey}\nException: {e}");
+            }
+
+            Debug.LogError($"[Resolver] Missing asset for type {typeof(T)}");
+            return null;
+        }
+
+
+        public static T Resolve<T>(IAddressableAssetProvider<T> provider) where T : Object
+        {
+            if (provider == null)
+            {
+                Debug.LogError("[Resolver] Provider is NULL");
+                return null;
+            }
+
+            try
+            {
+                if (provider.UseAddressable)
+                {
+#if UNITY_EDITOR
+                    if (provider.AssetReference != null && provider.AssetReference.editorAsset != null)
+                    {
+                        return provider.AssetReference.editorAsset;
+                    }
+#endif
+
+                    if (provider.AssetReference != null && provider.AssetReference.RuntimeKeyIsValid())
+                    {
+                        return GetLoadedAsset<T>(provider.AssetReference);
+                    }
+                }
+                else
+                {
+                    return provider.DirectAsset;
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[Resolver] Failed resolving loaded asset {typeof(T)}.\nException: {e}");
+            }
+
+            Debug.LogError($"[Resolver] Missing asset for type {typeof(T)}");
+            return null;
+        }
+
+        public static async UniTask LoadAllAssetsParallel(params IList<AssetReference>[] referenceGroups)
+        {
+            int totalCount = 0;
+            for (int g = 0; g < referenceGroups.Length; g++)
+            {
+                totalCount += referenceGroups[g].Count;
+            }
+
+            var tasks = new UniTask<Object>[totalCount];
+            int index = 0;
+
+            for (int g = 0; g < referenceGroups.Length; g++)
+            {
+                var group = referenceGroups[g];
+                for (int i = 0; i < group.Count; i++)
+                {
+                    tasks[index] = LoadAssetAsync<Object>(group[i]);
+                    index++;
+                }
+            }
+
+            await UniTask.WhenAll(tasks);
         }
     }
 

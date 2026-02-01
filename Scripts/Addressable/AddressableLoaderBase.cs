@@ -24,7 +24,7 @@ namespace RAXY.Core.Addressable
                 if (reference == null)
                     continue;
 
-                tasks.Add(AddressableService.Instance.LoadAssetAsync<Object>(reference));
+                tasks.Add(AddressableService.LoadAssetAsync<Object>(reference));
             }
 
             await UniTask.WhenAll(tasks);
@@ -36,7 +36,7 @@ namespace RAXY.Core.Addressable
         {
             foreach (var reference in assetReferences)
             {
-                AddressableService.Instance.Release(reference);
+                AddressableService.Release(reference);
             }
         }
     }
