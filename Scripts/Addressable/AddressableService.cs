@@ -279,7 +279,7 @@ namespace RAXY.Core.Addressable
                 if (provider.UseAddressable)
                 {
 #if UNITY_EDITOR
-                    if (provider.AssetReference != null && provider.AssetReference.editorAsset != null)
+                    if (!Application.isPlaying && provider.AssetReference != null && provider.AssetReference.editorAsset != null)
                     {
                         return provider.AssetReference.editorAsset;
                     }
