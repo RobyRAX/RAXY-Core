@@ -7,6 +7,7 @@ using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceLocations;
 
 using Object = UnityEngine.Object;
 
@@ -92,6 +93,133 @@ namespace RAXY.Core.Addressable
             }
 
             await UniTask.WhenAll(tasks);
+        }
+
+        public static async UniTask<List<T>> LoadAssetsByLabelAsync<T>(string label, string assetKey = null) where T : class
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(label))
+                {
+                    CustomDebug.LogError("Label is null or empty");
+                    return null;
+                }
+
+                CustomDebug.Log($"Loading assets by label: {label}");
+
+                // Get all asset locations with the specified label
+                var locationsHandle = Addressables.LoadResourceLocationsAsync(label, typeof(T));
+                await locationsHandle.Task;
+
+                if (locationsHandle.Status != AsyncOperationStatus.Succeeded)
+                {
+                    CustomDebug.LogError($"Failed to load resource locations for label: {label}");
+                    Addressables.Release(locationsHandle);
+                    return null;
+                }
+
+                var locations = locationsHandle.Result;
+                if (locations == null || locations.Count == 0)
+                {
+                    CustomDebug.LogWarning($"No assets found with label: {label}");
+                    Addressables.Release(locationsHandle);
+                    return new List<T>();
+                }
+
+                // Load all assets in parallel using LoadAssetAsync to track them
+                var tasks = new UniTask<T>[locations.Count];
+                for (int i = 0; i < locations.Count; i++)
+                {
+                    tasks[i] = LoadAssetAsync<T>(locations[i], assetKey);
+                }
+
+                var results = await UniTask.WhenAll(tasks);
+
+                CustomDebug.Log($"Successfully loaded {locations.Count} assets from label: {label}");
+                Addressables.Release(locationsHandle);
+
+                return new List<T>(results);
+            }
+            catch (Exception ex)
+            {
+                CustomDebug.LogError($"Exception while loading assets by label '{label}': {ex.Message}");
+                return null;
+            }
+        }
+
+        static string GetLocationKey(IResourceLocation location)
+        {
+            if (location == null)
+                return null;
+
+            if (!string.IsNullOrEmpty(location.PrimaryKey))
+                return location.PrimaryKey;
+
+            if (!string.IsNullOrEmpty(location.InternalId))
+                return location.InternalId;
+
+            return location.ToString();
+        }
+
+        public static async UniTask<T> LoadAssetAsync<T>(IResourceLocation location, string assetKey = null) where T : class
+        {
+            try
+            {
+                if (location == null)
+                {
+                    CustomDebug.LogError("Asset location is null");
+                    return null;
+                }
+
+                var locationKey = GetLocationKey(location);
+                if (string.IsNullOrEmpty(locationKey))
+                {
+                    CustomDebug.LogError("Asset location key is null or empty");
+                    return null;
+                }
+
+                CustomDebug.Log($"Loading asset: {locationKey}");
+
+                if (Instance.LoadedAssetDict.TryGetValue(locationKey, out var loadedAsset))
+                {
+                    if (loadedAsset.handle.IsDone && loadedAsset.handle.Status == AsyncOperationStatus.Succeeded)
+                    {
+                        CustomDebug.Log($"Asset already loaded: {locationKey}");
+
+                        loadedAsset.AddKey(assetKey);
+                        return loadedAsset.handle.Result as T;
+                    }
+
+                    CustomDebug.Log($"Waiting for asset to load: {locationKey}");
+                    await loadedAsset.handle.Task;
+
+                    loadedAsset.AddKey(assetKey);
+                    return loadedAsset.handle.Result as T;
+                }
+
+                CustomDebug.Log($"Starting async load for asset: {locationKey}");
+
+                var handle = Addressables.LoadAssetAsync<T>(location);
+                Instance.LoadedAssetDict.Add(locationKey, new AddressableLoadedAsset(locationKey, handle));
+
+                await handle.Task;
+
+                if (handle.Status != AsyncOperationStatus.Succeeded)
+                {
+                    CustomDebug.LogError($"Failed to load asset: {locationKey}");
+                    Instance.LoadedAssetDict.Remove(locationKey);
+                    return null;
+                }
+
+                CustomDebug.Log($"Successfully loaded asset: {locationKey}");
+                Instance.LoadedAssetDict[locationKey].AddKey(assetKey);
+                return handle.Result;
+            }
+            catch (Exception ex)
+            {
+                CustomDebug.LogError($"Exception while loading asset: {ex.Message}");
+                return null;
+            }
         }
 
         public static async UniTask<T> LoadAssetAsync<T>(AssetReference reference, string assetKey = null) where T : class
@@ -348,7 +476,7 @@ namespace RAXY.Core.Addressable
     {
         [TableColumnWidth(100, false)]
         [ShowInInspector]
-        string assetGuid;
+        string id;
 
         [ShowInInspector]
         object loadedAsset;
@@ -357,9 +485,9 @@ namespace RAXY.Core.Addressable
         HashSet<string> keys;
 
         public AddressableServiceAssetDrawer() { }
-        public AddressableServiceAssetDrawer(string assetGuid, AddressableLoadedAsset loadedAsset)
+        public AddressableServiceAssetDrawer(string id, AddressableLoadedAsset loadedAsset)
         {
-            this.assetGuid = assetGuid;
+            this.id = id;
             this.loadedAsset = (loadedAsset.handle.IsDone && loadedAsset.handle.Status == AsyncOperationStatus.Succeeded)
                                 ? loadedAsset.handle.Result
                                 : null;
