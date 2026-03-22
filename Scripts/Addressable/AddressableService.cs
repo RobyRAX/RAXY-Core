@@ -367,13 +367,15 @@ namespace RAXY.Core.Addressable
                 if (provider.UseAddressable)
                 {
 #if UNITY_EDITOR
-                    if (provider.AssetReference != null && provider.AssetReference.editorAsset != null)
+                    if (!Application.isPlaying && 
+                        provider.AssetReference != null && 
+                        provider.AssetReference.editorAsset != null)
                     {
                         return provider.AssetReference.editorAsset;
                     }
 #endif
-
-                    if (provider.AssetReference != null && provider.AssetReference.RuntimeKeyIsValid())
+                    if (provider.AssetReference != null && 
+                        provider.AssetReference.RuntimeKeyIsValid())
                     {
                         provider.CachedAddressableAsset = await LoadAssetAsync<T>(provider.AssetReference);
                         return provider.CachedAddressableAsset;
