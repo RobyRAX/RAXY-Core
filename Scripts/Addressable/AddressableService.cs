@@ -161,6 +161,18 @@ namespace RAXY.Core.Addressable
             return location.ToString();
         }
 
+        static string GetReferenceKey(AssetReference reference)
+        {
+            if (reference == null)
+                return null;
+
+            var runtimeKey = reference.RuntimeKey?.ToString();
+            if (!string.IsNullOrEmpty(runtimeKey))
+                return runtimeKey;
+
+            return reference.AssetGUID;
+        }
+
         public static async UniTask<T> LoadAssetAsync<T>(IResourceLocation location, string assetKey = null) where T : class
         {
             try
@@ -240,8 +252,9 @@ namespace RAXY.Core.Addressable
                 }
 
                 CustomDebug.Log($"Loading asset: {reference.RuntimeKey}");
+                var referenceKey = GetReferenceKey(reference);
                 
-                if (Instance.LoadedAssetDict.TryGetValue(reference.AssetGUID, out var loadedAsset))
+                if (Instance.LoadedAssetDict.TryGetValue(referenceKey, out var loadedAsset))
                 {
                     if (loadedAsset.handle.IsDone && loadedAsset.handle.Status == AsyncOperationStatus.Succeeded)
                     {
@@ -261,19 +274,19 @@ namespace RAXY.Core.Addressable
                 CustomDebug.Log($"Starting async load for asset: {reference.RuntimeKey}");
 
                 var handle = reference.LoadAssetAsync<T>();
-                Instance.LoadedAssetDict.Add(reference.AssetGUID, new AddressableLoadedAsset(reference.AssetGUID, handle));
+                Instance.LoadedAssetDict.Add(referenceKey, new AddressableLoadedAsset(referenceKey, handle));
 
                 await handle.Task;
 
                 if (handle.Status != AsyncOperationStatus.Succeeded)
                 {
                     CustomDebug.LogError($"Failed to load asset: {reference.RuntimeKey}");
-                    Instance.LoadedAssetDict.Remove(reference.AssetGUID);
+                    Instance.LoadedAssetDict.Remove(referenceKey);
                     return null;
                 }
 
                 CustomDebug.Log($"Successfully loaded asset: {reference.RuntimeKey}");
-                Instance.LoadedAssetDict[reference.AssetGUID].AddKey(assetKey);
+                Instance.LoadedAssetDict[referenceKey].AddKey(assetKey);
                 return handle.Result;
             }
             catch (Exception ex)
@@ -291,7 +304,8 @@ namespace RAXY.Core.Addressable
         /// <returns></returns>
         public static T GetLoadedAsset<T>(AssetReference reference) where T : class
         {
-            if (Instance.LoadedAssetDict.TryGetValue(reference.AssetGUID, out var loadedAsset))
+            var referenceKey = GetReferenceKey(reference);
+            if (Instance.LoadedAssetDict.TryGetValue(referenceKey, out var loadedAsset))
             {
                 if (loadedAsset.handle.IsDone && loadedAsset.handle.Status == AsyncOperationStatus.Succeeded)
                 {
@@ -299,7 +313,7 @@ namespace RAXY.Core.Addressable
                 }
             }
 
-            CustomDebug.LogWarning($"Asset with GUID: {reference.AssetGUID} isn't loaded yet");
+            CustomDebug.LogWarning($"Asset with key: {referenceKey} isn't loaded yet");
             return null;
         }
 
@@ -307,10 +321,11 @@ namespace RAXY.Core.Addressable
         [Button]
         public static void Release(AssetReference reference)
         {
-            if (Instance.LoadedAssetDict.TryGetValue(reference.AssetGUID, out var handle))
+            var referenceKey = GetReferenceKey(reference);
+            if (Instance.LoadedAssetDict.TryGetValue(referenceKey, out var handle))
             {
                 Addressables.Release(handle);
-                Instance.LoadedAssetDict.Remove(reference.AssetGUID);
+                Instance.LoadedAssetDict.Remove(referenceKey);
             }
         }
 
