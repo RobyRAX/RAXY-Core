@@ -5,5 +5,10 @@
   "author": {
     "name": "RobyRAX",
     "url": "https://github.com/RobyRAX"
+  },
+  "dependencies": {
+    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
+    "com.raxy.utility": "1.0.0",
+    "com.unity.addressables": "3.1.0"
   }
 }
