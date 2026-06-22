@@ -60,9 +60,15 @@ namespace RAXY.Core
         [HorizontalGroup("Runtime/Op")]
         [Button]
         [HideInEditorMode]
-        public void RegisterSepObject(ISepObject sepObject)
+        public void RegisterSepObject(ISepObject sepObject, string groupName = null)
         {
-            var selected = GetSepGroup(sepObject);
+            SepGroupRuntime selected = null;
+
+            if (string.IsNullOrEmpty(groupName))
+                selected = GetSepGroup(sepObject);
+            else
+                selected = RuntimeSepGroups.Find(x => x.GroupName == groupName);
+
             if (selected == null)
                 return;
 
