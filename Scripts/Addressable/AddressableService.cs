@@ -58,12 +58,24 @@ namespace RAXY.Core.Addressable
         }
 #endif
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            Application.quitting -= OnApplicationQuitting;
+            Application.quitting += OnApplicationQuitting;
+        }
+
+        static void OnApplicationQuitting()
+        {
+            ReleaseAll();
+        }
+
         private void OnDestroy()
         {
+            ReleaseAll();
+
             if (_instance == this)
-            {
                 _instance = null;
-            }
         }
 
         public static async UniTask<T> LoadAssetAsync<T>(string assetKey, AssetReference reference) where T : class
@@ -302,31 +314,55 @@ namespace RAXY.Core.Addressable
         /// <typeparam name="T"></typeparam>
         /// <param name="reference"></param>
         /// <returns></returns>
-        public static T GetLoadedAsset<T>(AssetReference reference) where T : class
+        public static T TryGetLoadedAsset<T>(AssetReference reference) where T : class
         {
             var referenceKey = GetReferenceKey(reference);
             if (Instance.LoadedAssetDict.TryGetValue(referenceKey, out var loadedAsset))
             {
                 if (loadedAsset.handle.IsDone && loadedAsset.handle.Status == AsyncOperationStatus.Succeeded)
-                {
                     return loadedAsset.handle.Result as T;
-                }
             }
 
-            CustomDebug.LogWarning($"Asset with key: {referenceKey} isn't loaded yet");
             return null;
+        }
+
+        public static T GetLoadedAsset<T>(AssetReference reference) where T : class
+        {
+            var asset = TryGetLoadedAsset<T>(reference);
+            if (asset == null)
+                CustomDebug.LogWarning($"Asset with key: {GetReferenceKey(reference)} isn't loaded yet");
+
+            return asset;
         }
 
         [TitleGroup("Test Function")]
         [Button]
         public static void Release(AssetReference reference)
         {
+            if (reference == null)
+                return;
+
             var referenceKey = GetReferenceKey(reference);
-            if (Instance.LoadedAssetDict.TryGetValue(referenceKey, out var handle))
+            if (!Instance.LoadedAssetDict.TryGetValue(referenceKey, out var loadedAsset))
+                return;
+
+            if (loadedAsset.handle.IsValid())
+                Addressables.Release(loadedAsset.handle);
+
+            Instance.LoadedAssetDict.Remove(referenceKey);
+        }
+
+        [TitleGroup("Test Function")]
+        [Button]
+        public static void ReleaseAll()
+        {
+            foreach (var loadedAsset in Instance.LoadedAssetDict.Values)
             {
-                Addressables.Release(handle);
-                Instance.LoadedAssetDict.Remove(referenceKey);
+                if (loadedAsset.handle.IsValid())
+                    Addressables.Release(loadedAsset.handle);
             }
+
+            Instance.LoadedAssetDict.Clear();
         }
 
         [TitleGroup("Test Function")]
@@ -343,7 +379,8 @@ namespace RAXY.Core.Addressable
 
                     if (kvp.Value.keys.Count == 0)
                     {
-                        Addressables.Release(kvp.Value.handle);
+                        if (kvp.Value.handle.IsValid())
+                            Addressables.Release(kvp.Value.handle);
                         keysToRemove.Add(kvp.Key);
                     }
                 }

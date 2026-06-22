@@ -35,16 +35,7 @@ namespace RAXY.Core.Addressable
                         return AssetReference?.editorAsset;
 #endif
 
-                    if (CachedAddressableAsset == null)
-                    {
-                        CachedAddressableAsset = AddressableService.GetLoadedAsset<GameObject>(AssetReference);
-
-                        if (CachedAddressableAsset == null)
-                        {
-                            Debug.LogWarning($"[GameObject] Addressable asset NOT loaded yet for {AssetReference.AssetGUID}");
-                        }
-                    }
-
+                    CachedAddressableAsset = AddressableService.TryGetLoadedAsset<GameObject>(AssetReference);
                     return CachedAddressableAsset;
                 }
                 else

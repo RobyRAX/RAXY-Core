@@ -37,16 +37,7 @@ namespace RAXY.Core.Addressable
                     }
 #endif
 
-                    if (CachedAddressableAsset == null)
-                    {
-                        CachedAddressableAsset = AddressableService.GetLoadedAsset<Sprite>(AssetReference);
-
-                        if (CachedAddressableAsset == null)
-                        {
-                            Debug.LogWarning($"[Sprite] Addressable asset NOT loaded yet for {AssetReference?.AssetGUID}");
-                        }
-                    }
-
+                    CachedAddressableAsset = AddressableService.TryGetLoadedAsset<Sprite>(AssetReference);
                     return CachedAddressableAsset;
                 }
                 else
