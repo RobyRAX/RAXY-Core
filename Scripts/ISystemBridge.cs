@@ -17,7 +17,7 @@ namespace RAXY.Core
 
     public interface IBridgeable
     {
-        public bool FirstInitDone { get; set; }
+        public bool InitDone { get; set; }
     }
 
 #if UNITY_EDITOR
@@ -52,7 +52,7 @@ namespace RAXY.Core
                 if (SystemA == null)
                     return false;
 
-                return SystemA.FirstInitDone;
+                return SystemA.InitDone;
             }
         }
 
@@ -82,7 +82,7 @@ namespace RAXY.Core
                 if (SystemB == null)
                     return false;
 
-                return SystemB.FirstInitDone;
+                return SystemB.InitDone;
             }
         }
 

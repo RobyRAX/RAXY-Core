@@ -10,7 +10,7 @@ namespace RAXY.Core
         public UniTask PreInit();
         public UniTask Init();
         public GameObject GetGameObject { get; }
-        public bool FirstInitDone { get; set; }
+        public bool InitDone { get; set; }
 
         public int Order { get; set; } 
         public string SepGroup { get; set; }
@@ -29,7 +29,7 @@ namespace RAXY.Core
 
         [ShowInInspector]
         [TableColumnWidth(75, false)]
-        public bool InitDone => SepObject.FirstInitDone;
+        public bool InitDone => SepObject.InitDone;
     }
 #endif
 }
