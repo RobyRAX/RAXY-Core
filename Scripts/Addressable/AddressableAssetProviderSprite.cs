@@ -1,4 +1,5 @@
 using System;
+using Newtonsoft.Json;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -15,15 +16,21 @@ namespace RAXY.Core.Addressable
         [HideIf("UseAddressable")]
         [SerializeField]
         protected Sprite directAsset;
+
+        [JsonIgnore]
         public Sprite DirectAsset => directAsset;
 
         [ShowIf("UseAddressable")]
         [SerializeField]
         protected AssetReferenceSprite assetReference;
 
+        [JsonIgnore]
         public AssetReferenceT<Sprite> AssetReference => assetReference;
+
+        [JsonIgnore]
         public Sprite CachedAddressableAsset { get; set; }
 
+        [JsonIgnore]
         public Sprite Asset
         {
             get
